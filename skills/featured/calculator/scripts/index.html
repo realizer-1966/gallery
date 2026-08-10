@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculator Skill</title>
+</head>
+<body>
+  <script>
+    // ── Calculator logic ─────────────────────────────────────────────────────
+    function calculate(a, op, b) {
+      if (!["+", "-", "*", "/", "^", "sqrt", "%"].includes(op)) {
+        return { error: `Unknown operator: ${op}. Use +, -, *, /, ^, sqrt, %.` };
+      }
+
+      if (op === "sqrt") {
+        if (a < 0) {
+          return { error: "Cannot take square root of a negative number." };
+        }
+        return { result: Math.round(Math.sqrt(a) * 1e10) / 1e10 };
+      }
+
+      if (b === undefined || b === null) {
+        return { error: `Operator '${op}' requires two numbers.` };
+      }
+
+      switch (op) {
+        case "+": return { result: a + b };
+        case "-": return { result: a - b };
+        case "*": return { result: a * b };
+        case "/":
+          if (b === 0) return { error: "Cannot divide by zero." };
+          return { result: a / b };
+        case "^": return { result: Math.pow(a, b) };
+        case "%":
+          if (b === 0) return { error: "Cannot calculate percentage with zero base." };
+          return { result: (a / b) * 100 };
+        default:
+          return { error: "Unknown error." };
+      }
+    }
+
+    function formatResult(value) {
+      if (Number.isInteger(value)) return String(value);
+      // round to 10 decimal places and strip trailing zeros
+      const s = value.toFixed(10).replace(/\.?0+$/, "");
+      return s;
+    }
+
+    // ── Entry point ───────────────────────────────────────────────────────────
+    window['ai_edge_gallery_get_result'] = async (dataStr) => {
+      try {
+        const jsonData = JSON.parse(dataStr || '{}');
+        const a = Number(jsonData.a);
+        const op = jsonData.op || "";
+        const b = jsonData.b !== undefined ? Number(jsonData.b) : undefined;
+
+        if (isNaN(a)) {
+          return JSON.stringify({ error: "Invalid first number." });
+        }
+
+        const calcResult = calculate(a, op, b);
+
+        if (calcResult.error) {
+          return JSON.stringify(calcResult);
+        }
+
+        const formatted = formatResult(calcResult.result);
+        const expression = op === "sqrt"
+          ? `√${a} = ${formatted}`
+          : `${a} ${op} ${b} = ${formatted}`;
+
+        return JSON.stringify({
+          result: expression,
+          webview: {
+            url: `webview.html?a=${encodeURIComponent(a)}&op=${encodeURIComponent(op)}&b=${encodeURIComponent(b || '')}&result=${encodeURIComponent(formatted)}&v=${Date.now()}`,
+            aspectRatio: 0.7
+          }
+        });
+      } catch (e) {
+        console.error(e);
+        return JSON.stringify({ error: `Calculator error: ${e.message}` });
+      }
+    };
+  </script>
+</body>
+</html>

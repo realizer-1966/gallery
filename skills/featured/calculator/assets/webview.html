@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Calculator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 12px;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .calculator {
+      width: 100%;
+      max-width: 300px;
+      background: #16213e;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .display {
+      background: #0f3460;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      min-height: 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: flex-end;
+      word-break: break-all;
+    }
+    .expression {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    .result {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #e0e0e0;
+    }
+    .result-placeholder {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #444;
+    }
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .btn {
+      aspect-ratio: 1;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.2rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn:active { transform: scale(0.93); opacity: 0.8; }
+    .btn-num { background: #1a1a3e; color: #e0e0e0; }
+    .btn-op { background: #0f3460; color: #4fc3f7; }
+    .btn-eq { background: #4fc3f7; color: #1a1a2e; font-size: 1.4rem; }
+    .btn-func { background: #0f3460; color: #ff9800; }
+    .btn-clear { background: #c62828; color: white; }
+    .btn-wide { grid-column: span 2; aspect-ratio: auto; height: 56px; }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #c62828;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 100;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="calculator">
+    <div class="display">
+      <div class="expression" id="expression"></div>
+      <div class="result" id="resultDisplay">
+        <span class="result-placeholder">0</span>
+      </div>
+    </div>
+    <div class="buttons">
+      <button class="btn btn-clear" onclick="clearAll()">C</button>
+      <button class="btn btn-func" onclick="inputOp('sqrt')">√</button>
+      <button class="btn btn-func" onclick="inputOp('%')">%</button>
+      <button class="btn btn-func" onclick="inputOp('^')">^</button>
+
+      <button class="btn btn-num" onclick="inputNum('7')">7</button>
+      <button class="btn btn-num" onclick="inputNum('8')">8</button>
+      <button class="btn btn-num" onclick="inputNum('9')">9</button>
+      <button class="btn btn-op" onclick="inputOp('/')">÷</button>
+
+      <button class="btn btn-num" onclick="inputNum('4')">4</button>
+      <button class="btn btn-num" onclick="inputNum('5')">5</button>
+      <button class="btn btn-num" onclick="inputNum('6')">6</button>
+      <button class="btn btn-op" onclick="inputOp('*')">×</button>
+
+      <button class="btn btn-num" onclick="inputNum('1')">1</button>
+      <button class="btn btn-num" onclick="inputNum('2')">2</button>
+      <button class="btn btn-num" onclick="inputNum('3')">3</button>
+      <button class="btn btn-op" onclick="inputOp('-')">−</button>
+
+      <button class="btn btn-num" onclick="inputNum('0')">0</button>
+      <button class="btn btn-num" onclick="inputNum('.')">.</button>
+      <button class="btn btn-eq btn-wide" onclick="compute()">=</button>
+      <button class="btn btn-op" onclick="inputOp('+')">+</button>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let currentA = "";
+    let currentOp = "";
+    let currentB = "";
+    let hasResult = false;
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "toast show";
+      clearTimeout(t._timeout);
+      t._timeout = setTimeout(() => { t.className = "toast"; }, 2000);
+    }
+
+    function updateDisplay() {
+      const exprEl = document.getElementById("expression");
+      const resultEl = document.getElementById("resultDisplay");
+
+      if (currentOp === "sqrt") {
+        exprEl.textContent = `√(${currentA || "0"})`;
+      } else if (currentOp && currentB) {
+        exprEl.textContent = `${currentA} ${currentOp} ${currentB}`;
+      } else if (currentOp) {
+        exprEl.textContent = `${currentA} ${currentOp}`;
+      } else {
+        exprEl.textContent = currentA || "";
+      }
+
+      if (hasResult && currentA) {
+        resultEl.innerHTML = `<span style="font-size:2rem;font-weight:700;color:#4fc3f7;">${currentA}</span>`;
+      } else {
+        resultEl.innerHTML = `<span class="result-placeholder">${currentB || currentA || "0"}</span>`;
+      }
+    }
+
+    function inputNum(digit) {
+      if (hasResult) {
+        // Start fresh after a result
+        currentA = digit;
+        currentOp = "";
+        currentB = "";
+        hasResult = false;
+      } else if (currentOp) {
+        if (digit === "." && currentB.includes(".")) return;
+        currentB += digit;
+      } else {
+        if (digit === "." && currentA.includes(".")) return;
+        currentA += digit;
+      }
+      updateDisplay();
+    }
+
+    function inputOp(op) {
+      if (hasResult) {
+        // Use result as first number for next operation
+        currentOp = op;
+        currentB = "";
+        hasResult = false;
+        updateDisplay();
+        return;
+      }
+
+      if (op === "sqrt") {
+        if (currentA) {
+          doCalculate(Number(currentA), "sqrt");
+          return;
+        }
+        showToast("Enter a number first!");
+        return;
+      }
+
+      if (!currentA) {
+        showToast("Enter a number first!");
+        return;
+      }
+
+      if (currentOp && currentB) {
+        // Chain: compute current, then set new op
+        doCalculate(Number(currentA), currentOp, Number(currentB));
+        // After calculation, currentA is the result, set new op
+        setTimeout(() => {
+          currentOp = op;
+          currentB = "";
+          hasResult = false;
+          updateDisplay();
+        }, 10);
+        return;
+      }
+
+      currentOp = op;
+      currentB = "";
+      updateDisplay();
+    }
+
+    function compute() {
+      if (hasResult) return;
+      if (!currentA) return;
+
+      if (currentOp === "sqrt") {
+        doCalculate(Number(currentA), "sqrt");
+        return;
+      }
+
+      if (!currentOp || !currentB) {
+        showToast("Enter a complete expression!");
+        return;
+      }
+
+      doCalculate(Number(currentA), currentOp, Number(currentB));
+    }
+
+    function doCalculate(a, op, b) {
+      let result;
+      let error;
+
+      if (!["+", "-", "*", "/", "^", "sqrt", "%"].includes(op)) {
+        error = `Unknown operator: ${op}`;
+      } else if (op === "sqrt") {
+        if (a < 0) { error = "Cannot take square root of a negative number."; }
+        else { result = Math.round(Math.sqrt(a) * 1e10) / 1e10; }
+      } else if (b === undefined || b === null || isNaN(b)) {
+        error = `Operator '${op}' requires two numbers.`;
+      } else {
+        switch (op) {
+          case "+": result = a + b; break;
+          case "-": result = a - b; break;
+          case "*": result = a * b; break;
+          case "/":
+            if (b === 0) { error = "Cannot divide by zero."; }
+            else { result = a / b; }
+            break;
+          case "^": result = Math.pow(a, b); break;
+          case "%":
+            if (b === 0) { error = "Cannot calculate percentage with zero base."; }
+            else { result = (a / b) * 100; }
+            break;
+        }
+      }
+
+      if (error) {
+        showToast(error);
+        return;
+      }
+
+      // Format result
+      let formatted;
+      if (Number.isInteger(result)) {
+        formatted = String(result);
+      } else {
+        formatted = result.toFixed(10).replace(/\.?0+$/, "");
+      }
+
+      currentA = formatted;
+      currentOp = "";
+      currentB = "";
+      hasResult = true;
+      updateDisplay();
+    }
+
+    function clearAll() {
+      currentA = "";
+      currentOp = "";
+      currentB = "";
+      hasResult = false;
+      updateDisplay();
+    }
+
+    // ── Init: load from URL params (passed from index.html) ──────────────────
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const a = params.get("a");
+      const op = params.get("op");
+      const b = params.get("b");
+      const result = params.get("result");
+      if (result) {
+        currentA = result;
+        hasResult = true;
+      } else if (a && op) {
+        currentA = a;
+        currentOp = op;
+        currentB = b || "";
+      }
+    } catch (e) { console.warn("URL param parse failed:", e); }
+
+    updateDisplay();
+  </script>
+</body>
+</html>

@@ -29,5 +29,9 @@
           run: echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-37.0"
         - name: Build
           run: ./gradlew assembleRelease
-  
-  
+
+        - name: Upload APK
+          uses: actions/upload-artifact@v4
+          with:
+            name: app-release
+            path: app/build/outputs/apk/release/*.apk

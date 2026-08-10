@@ -95,6 +95,7 @@ dependencies {
   implementation(libs.webrtc)
   implementation(libs.vosk)
   implementation(libs.ktor.client.websockets)
+  implementation(libs.ktor.websockets)
   implementation(libs.commonmark)
   implementation(libs.richtext)
   implementation(libs.tflite)

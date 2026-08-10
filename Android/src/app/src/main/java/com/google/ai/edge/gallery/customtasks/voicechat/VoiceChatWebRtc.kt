@@ -36,13 +36,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import org.webrtc.AudioSink
+import org.webrtc.AudioTrack
+import org.webrtc.AudioTrackSink
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
-import org.webrtc.RTCConfiguration
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
 import org.webrtc.AudioTrack
@@ -288,13 +288,13 @@ class VoiceChatWebRtc(
     if (pc != null) return
     Log.i(TAG, "Creating PeerConnection")
     val rtcConfig =
-      RTCConfiguration(
+      PeerConnection.RTCConfiguration(
         listOf(
           PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
           PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
         ),
       )
-    rtcConfig.sdpSemantics = org.webrtc.SdpSemantics.UNIFIED_PLAN
+    rtcConfig.sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
     val factory = PeerConnectionFactory.builder().createPeerConnectionFactory()
     val newPc =
       factory.createPeerConnection(rtcConfig, createObserver())
@@ -415,12 +415,15 @@ class VoiceChatWebRtc(
     }
 
   private val micSink =
-    AudioSink { audio, sampleRate, channelCount, _ ->
+    AudioTrackSink { audioData, bitsPerSample, sampleRate, channelCount, _, _ ->
+      if (bitsPerSample != 16) return@AudioTrackSink
       if (!sttStarted) {
         sttStarted = true
         Log.i(TAG, "Audio flowing: $sampleRate Hz, $channelCount ch")
       }
-      onMicPcm(audio, sampleRate, channelCount)
+      val pcm = ByteArray(audioData.remaining())
+      audioData.get(pcm)
+      onMicPcm(pcm, sampleRate, channelCount)
     }
 
   private fun answerConstraints(): MediaConstraints =

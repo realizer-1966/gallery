@@ -17,6 +17,7 @@
 package com.google.ai.edge.gallery
 
 import android.app.Application
+import android.util.Log
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.notifications.NotificationScheduleManager
 import com.google.ai.edge.gallery.ui.theme.ThemeSettings
@@ -39,7 +40,16 @@ class GalleryApplication : Application() {
     // Load saved theme.
     ThemeSettings.themeOverride.value = dataStoreRepository.readTheme()
 
-    FirebaseApp.initializeApp(this)
-    firebaseAnalytics?.setAnalyticsCollectionEnabled(dataStoreRepository.readFirebaseAnalytics())
+    // Firebase is optional — wrap in try/catch for builds without google-services.json.
+    try {
+      FirebaseApp.initializeApp(this)
+      firebaseAnalytics?.setAnalyticsCollectionEnabled(dataStoreRepository.readFirebaseAnalytics())
+    } catch (e: Exception) {
+      Log.w(TAG, "Firebase not available: ${e.message}")
+    }
+  }
+
+  companion object {
+    private const val TAG = "GalleryApp"
   }
 }

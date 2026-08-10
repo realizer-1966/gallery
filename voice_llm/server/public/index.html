@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Chat — Browser Peer</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 0; padding: 16px; max-width: 640px; margin: 0 auto;
+  }
+  h1 { font-size: 1.3rem; margin: 8px 0 4px; }
+  p.sub { color: #888; margin: 0 0 16px; font-size: 0.85rem; }
+  .card {
+    border: 1px solid #4444; border-radius: 10px; padding: 14px; margin-bottom: 12px;
+    background: #ffffff0a;
+  }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  input[type=text] { flex: 1; min-width: 160px; padding: 8px 10px; border-radius: 8px; border: 1px solid #8888; font-size: 0.95rem; }
+  button { padding: 8px 14px; border-radius: 8px; border: none; background: #1a73e8; color: #fff; font-size: 0.95rem; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.ghost { background: transparent; border: 1px solid #8888; color: inherit; }
+  .status { font-size: 0.9rem; margin-top: 8px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #888; margin-right: 6px; }
+  .dot.on { background: #34a853; }
+  .dot.err { background: #ea4335; }
+  #log { height: 260px; overflow-y: auto; border: 1px solid #4444; border-radius: 8px; padding: 10px; font-size: 0.9rem; background: #00000008; }
+  #log .u { color: #1a73e8; }
+  #log .a { color: #188038; }
+  #log .m { color: #888; font-style: italic; }
+  #log div { margin-bottom: 4px; }
+  .meter { height: 8px; border-radius: 4px; background: #8882; margin-top: 8px; overflow: hidden; }
+  .meter > div { height: 100%; width: 0%; background: #34a853; transition: width 120ms; }
+</style>
+</head>
+<body>
+  <h1>🎙️ Voice Chat — Browser Peer</h1>
+  <p class="sub">WebRTC P2P with your Android phone (Gallery “Voice Chat” task). The phone runs
+  on-device STT + LiteRT LLM + TTS and streams the spoken answer back over an encrypted data channel.</p>
+
+  <div class="card">
+    <div class="row">
+      <input type="text" id="room" placeholder="Room code (e.g. my-room-123)" autocomplete="off">
+      <button id="connect">Connect</button>
+      <button id="mute" class="ghost" disabled>🔇 Mute</button>
+    </div>
+    <div class="status"><span class="dot" id="dot"></span><span id="status">Not connected. Enter the same room code as the phone and press Connect.</span></div>
+  </div>
+
+  <div class="card">
+    <div class="status">Phone status: <span id="phoneStatus">—</span></div>
+    <div class="meter"><div id="lvl"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content: space-between;">
+      <b>Transcript</b>
+      <button id="clear" class="ghost">Clear</button>
+    </div>
+    <div id="log"></div>
+  </div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// Elements & state
+// ---------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const roomInput = $("room"), connectBtn = $("connect"), muteBtn = $("mute");
+const statusEl = $("status"), dotEl = $("dot"), logEl = $("log");
+const phoneStatusEl = $("phoneStatus"), lvlEl = $("lvl").style;
+
+let ws = null;
+let pc = null;
+let dc = null;                 // "tts" data channel created by the phone
+let micStream = null;
+let muted = false;
+let connected = false;
+
+// Web Audio playback state
+let audioCtx = null;
+let playBufs = [];             // AudioBufferSourceNodes currently scheduled
+let curChunks = [];            // Float32Array[] while receiving
+let curSampleRate = 48000;
+let curChannels = 1;
+let maxLevel = 0;
+
+// ---------------------------------------------------------------------------
+// Logging helpers
+// ---------------------------------------------------------------------------
+function log(kind, text) {
+  const div = document.createElement("div");
+  div.className = kind;
+  const t = new Date().toLocaleTimeString();
+  if (kind === "u") div.textContent = `🧑 [${t}] ${text}`;
+  else if (kind === "a") div.textContent = `🤖 [${t}] ${text}`;
+  else div.textContent = `· [${t}] ${text}`;
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function setStatus(text, err = false) {
+  statusEl.textContent = text;
+  dotEl.className = "dot" + (err ? " err" : connected ? " on" : "");
+}
+function setPhoneStatus(text) {
+  phoneStatusEl.textContent = text;
+}
+
+// ---------------------------------------------------------------------------
+// Audio playback (TTS from the phone, delivered over the data channel)
+// ---------------------------------------------------------------------------
+function ensureAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+function stopPlayback() {
+  for (const s of playBufs) { try { s.stop(); } catch (_) {} }
+  playBufs = [];
+}
+
+function playPcm(typed, sampleRate, channels) {
+  const ctx = ensureAudioCtx();
+  stopPlayback();
+  const frameCount = Math.floor(typed.length / channels);
+  const buffer = ctx.createBuffer(channels, frameCount, sampleRate);
+  for (let ch = 0; ch < channels; ch++) {
+    const data = buffer.getChannelData(ch);
+    for (let i = 0; i < frameCount; i++) data[i] = typed[i * channels + ch];
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.connect(ctx.destination);
+  src.start();
+  playBufs.push(src);
+}
+
+function handleAudioStart(meta) {
+  curChunks = [];
+  curSampleRate = meta.sampleRate || 48000;
+  curChannels = meta.channels || 1;
+  maxLevel = 0;
+}
+function handleAudioChunk(pcm) {
+  // 16-bit little-endian -> float32
+  const f = new Float32Array(pcm.byteLength / 2);
+  const dv = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
+  for (let i = 0; i < f.length; i++) f[i] = dv.getInt16(i * 2, true) / 32768;
+  curChunks.push(f);
+  // crude level meter (decimate for perf)
+  let peak = 0;
+  for (let i = 0; i < f.length; i += 64) { const a = Math.abs(f[i]); if (a > peak) peak = a; }
+  maxLevel = Math.max(maxLevel, peak);
+  lvlEl.width = (maxLevel * 100).toFixed(0) + "%";
+}
+function handleAudioEnd() {
+  const total = curChunks.reduce((n, c) => n + c.length, 0);
+  if (total === 0) return;
+  const joined = new Float32Array(total);
+  let off = 0;
+  for (const c of curChunks) { joined.set(c, off); off += c.length; }
+  playPcm(joined, curSampleRate, curChannels);
+  curChunks = [];
+}
+
+// ---------------------------------------------------------------------------
+// Data channel (phone -> browser TTS audio + control)
+// ---------------------------------------------------------------------------
+function onDataChannel(channel) {
+  dc = channel;
+  dc.binaryType = "arraybuffer";
+  dc.onopen = () => { log("m", "TTS data channel open."); setPhoneStatus("connected"); };
+  dc.onclose = () => { setPhoneStatus("channel closed"); };
+  dc.onmessage = (ev) => {
+    if (typeof ev.data === "string") {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch { return; }
+      switch (msg.type) {
+        case "audio_start": handleAudioStart(msg); break;
+        case "audio_end": handleAudioEnd(); break;
+        case "text": log("a", msg.text); break;
+        case "stt": log("u", `(heard: ${msg.text})`); break;
+        case "status": setPhoneStatus(msg.text); break;
+        case "clear": logEl.innerHTML = ""; break;
+      }
+    } else {
+      handleAudioChunk(ev.data);
+    }
+  };
+  if (dc.readyState === "open") setPhoneStatus("connected");
+}
+
+// ---------------------------------------------------------------------------
+// WebRTC peer connection (browser = offerer, mic -> phone)
+// ---------------------------------------------------------------------------
+async function startCall() {
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true, noiseSuppression: true, autoGainControl: true,
+    },
+  });
+  const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+  pc = new RTCPeerConnection(config);
+  pc.onicecandidate = (ev) => {
+    if (ev.candidate) ws.send(JSON.stringify({ type: "ice", candidate: ev.candidate.toJSON() }));
+  };
+  pc.oniceconnectionstatechange = () => {
+    setStatus(`ICE: ${pc.iceConnectionState}`);
+    if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+      connected = true; setStatus("Connected — speak! The phone answers with voice.");
+      connectBtn.disabled = true; muteBtn.disabled = false;
+    } else if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
+      setStatus(`Connection lost (${pc.iceConnectionState}).`, true);
+    }
+  };
+  pc.ondatachannel = (ev) => onDataChannel(ev.channel);
+  micStream.getAudioTracks().forEach((t) => pc.addTrack(t, micStream));
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  ws.send(JSON.stringify({ type: "sdp", sdp: pc.localDescription.toJSON() }));
+}
+
+// ---------------------------------------------------------------------------
+// Signaling (WebSocket)
+// ---------------------------------------------------------------------------
+function connect() {
+  const room = roomInput.value.trim();
+  if (!room) { setStatus("Enter a room code first.", true); return; }
+  if (ws) ws.close();
+
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen = () => {
+    setStatus("Joined signaling server, waiting for the phone…");
+    ws.send(JSON.stringify({ type: "join", room, role: "browser" }));
+  };
+  ws.onmessage = async (ev) => {
+    const msg = JSON.parse(ev.data);
+    switch (msg.type) {
+      case "ready":
+        log("m", "Phone is in the room. Starting WebRTC call…");
+        setStatus("Starting call…");
+        try { await startCall(); } catch (e) { setStatus("Mic error: " + e.message, true); }
+        break;
+      case "sdp":
+        if (msg.from === "phone") {
+          await pc.setRemoteDescription(msg.sdp);
+          log("m", "Remote description applied.");
+        }
+        break;
+      case "ice":
+        if (msg.from === "phone" && pc) {
+          try { await pc.addIceCandidate(msg.candidate); } catch (e) { console.warn("addIceCandidate", e); }
+        }
+        break;
+      case "peer-left":
+        setStatus("Phone left the room.", true);
+        break;
+      case "error":
+        setStatus(msg.message, true);
+        break;
+    }
+  };
+  ws.onclose = () => {
+    if (connected) {
+      setStatus("Signaling closed.", true);
+      connected = false;
+      connectBtn.disabled = false; muteBtn.disabled = true;
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
+// UI wiring
+// ---------------------------------------------------------------------------
+connectBtn.onclick = connect;
+roomInput.addEventListener("keydown", (e) => { if (e.key === "Enter") connect(); });
+
+muteBtn.onclick = () => {
+  muted = !muted;
+  micStream?.getAudioTracks().forEach((t) => (t.enabled = !muted));
+  muteBtn.textContent = muted ? "🔇 Unmute" : "🔇 Mute";
+};
+
+$("clear").onclick = () => logEl.innerHTML = "";
+
+// Auto-focus room input
+roomInput.focus();
+</script>
+</body>
+</html>

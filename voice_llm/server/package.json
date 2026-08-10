@@ -1,0 +1,13 @@
+{
+  "name": "voice-llm-signaling",
+  "version": "1.0.0",
+  "description": "WebRTC signaling server + static host for the Voice Chat browser client (Gallery Voice Chat task)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "license": "Apache-2.0"
+}

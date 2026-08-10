@@ -717,6 +717,11 @@
   <string name="task_label_audio_scribe" translatable="false">Audio Scribe</string>
   <string name="task_label_tiny_garden" translatable="false">Tiny Garden</string>
   <string name="task_label_agent_skills" translatable="false">Agent Skills</string>
+  <string name="task_label_voice_chat" translatable="false">Voice Chat</string>
+  <!-- Description for the Voice Chat task. [CHAR_LIMIT=100] -->
+  <string name="task_desc_voice_chat" translatable="true" description="Description for the Voice Chat task.">Talk to an on-device LiteRT LLM from a browser over WebRTC</string>
+  <!-- Short description for the Voice Chat task. [CHAR_LIMIT=35] -->
+  <string name="task_short_desc_voice_chat" translatable="true" description="Short description for the Voice Chat task.">Voice chat over WebRTC</string>
   <!-- Description for the AI Chat task. [CHAR_LIMIT=100] -->
   <string name="task_desc_ai_chat" translatable="true" description="Description for the AI Chat task.">Chat with on-device large language models</string>
   <!-- Short description for the AI Chat task. [CHAR_LIMIT=35] -->

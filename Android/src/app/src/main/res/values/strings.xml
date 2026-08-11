@@ -716,6 +716,10 @@
   <string name="task_label_ask_image" translatable="false">Ask Image</string>
   <string name="task_label_audio_scribe" translatable="false">Audio Scribe</string>
   <string name="task_label_tiny_garden" translatable="false">Tiny Garden</string>
+  <string name="task_label_cooking_companion" translatable="false">Cooking Companion</string>
+  <string name="task_short_desc_cooking_companion" translatable="true" description="Short description for the Cooking Companion task. [CHAR_LIMIT=35]">Turn ingredients into recipes offline</string>
+  <string name="task_desc_cooking_companion" translatable="true" description="Description for the Cooking Companion task.">Cooking Companion turns the ingredients you have into delicious recipes, entirely on-device. Tell it what you have on hand and it will suggest a dish, list the ingredients and steps, and scale the recipe to any number of servings.\n\nNote: This is an experimental feature powered by an on-device LiteRT LLM.</string>
+  <string name="cooking_command_recorded" translatable="true" description="Label shown when the cooking assistant records a structured recipe via a tool. [CHAR_LIMIT=20]">Recipe recorded</string>
   <string name="task_label_agent_skills" translatable="false">Agent Skills</string>
   <!-- Description for the AI Chat task. [CHAR_LIMIT=100] -->
   <string name="task_desc_ai_chat" translatable="true" description="Description for the AI Chat task.">Chat with on-device large language models</string>

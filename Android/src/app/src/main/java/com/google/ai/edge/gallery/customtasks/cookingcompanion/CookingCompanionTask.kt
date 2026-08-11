@@ -94,8 +94,9 @@ class CookingCompanionTask @Inject constructor(@ApplicationContext private val c
       category = Category.LLM,
       icon = Icons.Outlined.Restaurant,
       models = mutableListOf(),
-      // Connect allowlist models to this task. The model is chosen from model_allowlist.json.
-      modelNames = listOf("Gemma3-1B-IT q4", "Gemma-3n-E2B-it-int4", "Gemma-3n-E4B-it-int4"),
+      // Connect allowlist models to this task. Names MUST match model_allowlists/1_0_18.json
+      // exactly (the allowlist the app loads at runtime). Gemma3-1B-IT is the lightest.
+      modelNames = listOf("Gemma3-1B-IT", "Gemma-3n-E2B-it", "Gemma-3n-E4B-it"),
       experimental = true,
       defaultSystemPrompt = SYSTEM_PROMPT,
     )

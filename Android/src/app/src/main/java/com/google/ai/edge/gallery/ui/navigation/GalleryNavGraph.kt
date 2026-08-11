@@ -541,9 +541,12 @@ private fun CustomTaskScreen(
 
   // Initialize model when model/download state changes.
   val curDownloadStatus = modelManagerUiState.modelDownloadStatus[selectedModel.name]
-  LaunchedEffect(curDownloadStatus, selectedModel.name) {
+  // Model-free custom tasks (e.g. Dice Roller, Unit Converter) have an empty URL,
+  // so there is nothing to download — initialize immediately without a download gate.
+  val needsDownload = selectedModel.url.isNotEmpty()
+  LaunchedEffect(curDownloadStatus, selectedModel.name, needsDownload) {
     if (!navigatingUp) {
-      if (curDownloadStatus?.status == ModelDownloadStatusType.SUCCEEDED) {
+      if (curDownloadStatus?.status == ModelDownloadStatusType.SUCCEEDED || !needsDownload) {
         Log.d(
           TAG,
           "Initializing model '${selectedModel.name}' from CustomTaskScreen launched effect",
@@ -626,11 +629,15 @@ private fun CustomTaskScreen(
         )
     ) {
       val curModelDownloadStatus = modelManagerUiState.modelDownloadStatus[selectedModel.name]
+      // Model-free tasks (empty URL) skip the download panel and show the UI directly.
+      val isReadyForContent =
+        selectedModel.url.isEmpty() ||
+          curModelDownloadStatus?.status == ModelDownloadStatusType.SUCCEEDED
       AnimatedContent(
-        targetState = curModelDownloadStatus?.status == ModelDownloadStatusType.SUCCEEDED
+        targetState = isReadyForContent
       ) { targetState ->
         when (targetState) {
-          // Main UI when model is downloaded.
+          // Main UI when model is downloaded (or no download needed).
           true -> content(innerPadding.calculateBottomPadding())
           // Model download
           false ->

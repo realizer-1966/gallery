@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unit Converter Skill</title>
+</head>
+<body>
+  <script>
+    // ── Conversion tables ────────────────────────────────────────────────────
+    // Each unit maps to a base unit multiplier.
+    const LENGTH = { mm: 0.001, cm: 0.01, m: 1, km: 1000, in: 0.0254, ft: 0.3048, yd: 0.9144, mi: 1609.344 };
+    const WEIGHT = { mg: 0.001, g: 1, kg: 1000, t: 1000000, oz: 28.349523125, lb: 453.59237 };
+    const DATA = { b: 1, kb: 1024, mb: 1024*1024, gb: 1024*1024*1024, tb: 1024*1024*1024*1024 };
+
+    function convertTemp(v, from, to) {
+      let c;
+      if (from === 'c') c = v;
+      else if (from === 'f') c = (v - 32) * 5 / 9;
+      else if (from === 'k') c = v - 273.15;
+      else return null;
+
+      if (to === 'c') return c;
+      if (to === 'f') return c * 9 / 5 + 32;
+      if (to === 'k') return c + 273.15;
+      return null;
+    }
+
+    function convert(value, from, to) {
+      from = String(from).toLowerCase();
+      to = String(to).toLowerCase();
+
+      // Temperature special case
+      if (['c','f','k'].includes(from) && ['c','f','k'].includes(to)) {
+        return convertTemp(value, from, to);
+      }
+
+      let table = null;
+      if (LENGTH[from] !== undefined && LENGTH[to] !== undefined) table = LENGTH;
+      else if (WEIGHT[from] !== undefined && WEIGHT[to] !== undefined) table = WEIGHT;
+      else if (DATA[from] !== undefined && DATA[to] !== undefined) table = DATA;
+      else return null;
+
+      return value * table[from] / table[to];
+    }
+
+    function formatResult(value) {
+      if (!isFinite(value)) return "Invalid conversion";
+      // Round to a sensible precision, strip trailing zeros
+      const rounded = Number(value.toPrecision(12));
+      if (Number.isInteger(rounded)) return String(rounded);
+      return String(rounded);
+    }
+
+    // ── Entry point ───────────────────────────────────────────────────────────
+    window['ai_edge_gallery_get_result'] = async (dataStr) => {
+      try {
+        const jsonData = JSON.parse(dataStr || '{}');
+        const value = Number(jsonData.value);
+        const from = String(jsonData.from || '');
+        const to = String(jsonData.to || '');
+
+        if (isNaN(value)) {
+          return JSON.stringify({ error: "Invalid numeric value." });
+        }
+        if (!from || !to) {
+          return JSON.stringify({ error: "Both 'from' and 'to' units are required." });
+        }
+
+        const result = convert(value, from, to);
+        if (result === null) {
+          return JSON.stringify({ error: `Unsupported or incompatible units: ${from} → ${to}.` });
+        }
+
+        const formatted = formatResult(result);
+        const expression = `${value} ${from} = ${formatted} ${to}`;
+
+        return JSON.stringify({
+          result: expression,
+          webview: {
+            url: `webview.html?value=${encodeURIComponent(value)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&result=${encodeURIComponent(formatted)}&v=${Date.now()}`,
+            aspectRatio: 0.8
+          }
+        });
+      } catch (e) {
+        console.error(e);
+        return JSON.stringify({ error: `Unit converter error: ${e.message}` });
+      }
+    };
+  </script>
+</body>
+</html>

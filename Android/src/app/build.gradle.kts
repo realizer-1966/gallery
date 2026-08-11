@@ -92,8 +92,6 @@ dependencies {
   implementation(libs.androidx.security.crypto)
   implementation(libs.androidx.webkit)
   implementation(libs.litertlm)
-  implementation(libs.webrtc)
-  implementation(libs.vosk)
   implementation(libs.ktor.client.websockets)
   implementation(libs.ktor.websockets)
   implementation(libs.commonmark)

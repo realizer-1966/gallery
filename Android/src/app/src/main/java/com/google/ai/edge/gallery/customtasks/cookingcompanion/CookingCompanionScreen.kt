@@ -81,6 +81,7 @@ fun CookingCompanionScreen(
   var clearTextTrigger by remember { mutableLongStateOf(0L) }
 
   val curDownloadStatus = modelManagerUiState.modelDownloadStatus[model.name]?.status
+  val commandRecordedLabel = stringResource(R.string.cooking_command_recorded)
   setAppBarControlsDisabled(
     curDownloadStatus == ModelDownloadStatusType.SUCCEEDED &&
       (!modelManagerUiState.isModelInitialized(model = model) || uiState.processing)
@@ -90,9 +91,9 @@ fun CookingCompanionScreen(
   LaunchedEffect(commandFlow) {
     commandFlow.collect { command ->
       Log.d(TAG, "Received command: ${command.action} payload=${command.payload}")
-      val label = stringResource(R.string.cooking_command_recorded)
       viewModel.addMessage(
-        message = ChatMessageText(content = "$label\n\n${command.payload}", side = ChatSide.AGENT)
+        message =
+          ChatMessageText(content = "$commandRecordedLabel\n\n${command.payload}", side = ChatSide.AGENT)
       )
     }
   }

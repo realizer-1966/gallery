@@ -7,6 +7,12 @@ description: A simple mood tracking skill that stores your daily mood and commen
 
 ## Instructions
 
+Call the `run_js` tool with **ALL THREE of the following exact parameters — you MUST include all three, never omit any of them.** Omitting any one causes the tool call to fail with a parameter error:
+
+- **skill_name**: `"mood-tracker"` — the name of this skill. ALWAYS include it, always exactly `"mood-tracker"`.
+- **script_name**: `"index.html"` — the script to run. Always `"index.html"`, always exactly this.
+- **data**: A JSON string with the fields described below. If the user gave no details, set `data` to the string `""` (an empty string) — do NOT omit the `data` parameter itself.
+
 The `mood-tracker` skill helps you keep track of your daily emotional well-being. You can log your mood on a scale of 1 to 10 and add a short comment about how you're feeling.
 
 ### Actions

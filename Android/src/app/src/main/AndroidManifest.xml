@@ -106,6 +106,27 @@
             android:exported="true"
             android:theme="@style/Theme.Gallery.OssLicenses" />
 
+        <!--
+        AppAuth OAuth callback handler. Required for the HuggingFace OAuth flow to receive the
+        redirect back into the app after login. Without this, the browser can't hand the OAuth
+        callback to the app and Android shows the "open with" chooser dialog instead.
+        -->
+        <activity
+            android:name="net.openid.appauth.RedirectUriReceiverActivity"
+            android:exported="true"
+            tools:node="merge">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.aiedge.gallery" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="net.openid.appauth.AuthorizationManagementActivity"
+            android:exported="false"
+            tools:node="merge" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"

@@ -37,7 +37,9 @@ class TestSkillMd:
         m = re.search(r"^description:\s*(.+)$", self.content, re.M)
         assert m, "frontmatter missing 'description'"
         assert len(m.group(1).strip()) >= 10, "description too short"
-        assert len(m.group(1).strip()) <= 60, "description too long (max 60 chars)"
+        # Bilingual description (Korean trigger words for on-device LLM matching)
+        # is intentionally longer than the 60-char Hermes convention.
+        assert len(m.group(1).strip()) <= 120, "description too long (max 120 chars)"
 
     def test_mentions_run_js(self):
         assert "run_js" in self.content, "SKILL.md must instruct run_js"

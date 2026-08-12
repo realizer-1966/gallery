@@ -83,17 +83,24 @@
     }
 
     // ── Entry point ───────────────────────────────────────────────────────────
+    // Robustness principle: on-device LLMs often call run_js with missing or
+    // partial data. NEVER return a hard error for missing values — open the
+    // interactive webview with sensible defaults instead, so the user always
+    // sees something usable.
     window['ai_edge_gallery_get_result'] = async (dataStr) => {
       try {
         const d = JSON.parse(dataStr || '{}');
         const currency = typeof d.currency === "string" && d.currency ? d.currency : "$";
         const action = d.action === "uneven" ? "uneven" : "even";
+        let defaultsNote = "";
 
         if (action === "uneven") {
-          if (!Array.isArray(d.expenses) || d.expenses.length === 0) {
-            return JSON.stringify({ error: "For uneven split, provide 'expenses' as a non-empty array of [name, amount] pairs, e.g. [[\"Alice\", 30], [\"Bob\", 25]]." });
+          let expenses = d.expenses;
+          if (!Array.isArray(expenses) || expenses.length === 0) {
+            expenses = [["Alice", 60], ["Bob", 40]];
+            defaultsNote = " (using sample values)";
           }
-          const expenses = d.expenses.map((e) => {
+          const cleaned = expenses.map((e) => {
             if (!Array.isArray(e) || e.length < 2) {
               throw new Error("Each expense must be [name, amount].");
             }
@@ -106,8 +113,9 @@
             return [name, amount];
           });
 
-          const result = settleDebts(expenses);
-          const lines = [`Total ${formatMoney(result.total, currency)}, fair share ${formatMoney(result.share, currency)} each.`];
+          const result = settleDebts(cleaned);
+          let lines = [`Total ${formatMoney(result.total, currency)}, fair share ${formatMoney(result.share, currency)} each.`];
+          if (defaultsNote) lines[0] += defaultsNote;
           if (result.transfers.length === 0) {
             lines.push("Everyone already paid equally — no transfers needed.");
           } else {
@@ -118,30 +126,29 @@
           }
 
           const webview = {
-            url: `webview.html?mode=uneven&currency=${encodeURIComponent(currency)}&expenses=${encodeURIComponent(JSON.stringify(expenses))}&v=${Date.now()}`,
+            url: `webview.html?mode=uneven&currency=${encodeURIComponent(currency)}&expenses=${encodeURIComponent(JSON.stringify(cleaned))}&v=${Date.now()}`,
             aspectRatio: 1.2,
           };
           return JSON.stringify({ result: lines.join("\n"), webview });
         }
 
-        // even mode (default)
-        const total = Number(d.total);
-        const people = Math.floor(Number(d.people));
-        const tipPercent = d.tip_percent === undefined ? 0 : Number(d.tip_percent);
-        const taxPercent = d.tax_percent === undefined ? 0 : Number(d.tax_percent);
+        // even mode (default) — missing/invalid values fall back to defaults.
+        const rawTotal = Number(d.total);
+        const rawPeople = Math.floor(Number(d.people));
+        const rawTip = d.tip_percent === undefined || d.tip_percent === null || d.tip_percent === "" ? 0 : Number(d.tip_percent);
+        const rawTax = d.tax_percent === undefined || d.tax_percent === null || d.tax_percent === "" ? 0 : Number(d.tax_percent);
 
-        if (isNaN(total) || total < 0) {
-          return JSON.stringify({ error: "Invalid 'total'. Provide a non-negative number." });
-        }
-        if (isNaN(people) || people < 1) {
-          return JSON.stringify({ error: "Invalid 'people'. Provide a positive integer (>= 1)." });
-        }
-        if (isNaN(tipPercent) || isNaN(taxPercent) || tipPercent < 0 || taxPercent < 0) {
-          return JSON.stringify({ error: "tip_percent and tax_percent must be non-negative numbers." });
-        }
+        let total = rawTotal;
+        let people = rawPeople;
+        let tipPercent = rawTip;
+        let taxPercent = rawTax;
+        if (isNaN(total) || total < 0) { total = 100; defaultsNote += " total=$100.00"; }
+        if (isNaN(people) || people < 1) { people = 4; defaultsNote += " people=4"; }
+        if (isNaN(tipPercent) || tipPercent < 0) { tipPercent = 0; }
+        if (isNaN(taxPercent) || taxPercent < 0) { taxPercent = 0; }
 
         const r = splitEvenly(total, people, tipPercent, taxPercent);
-        const parts = ["Bill: " + formatMoney(r.total, currency)];
+        let parts = ["Bill: " + formatMoney(r.total, currency)];
         if (r.tipAmount > 0) parts.push(`${tipPercent}% tip (${formatMoney(r.tipAmount, currency)})`);
         if (r.taxAmount > 0) parts.push(`${taxPercent}% tax (${formatMoney(r.taxAmount, currency)})`);
         let resultText = `${parts.join(" + ")} = ${formatMoney(r.grandTotal, currency)}. Each of ${people} pays ${formatMoney(r.perPerson, currency)}.`;
@@ -149,6 +156,9 @@
         const exactSet = new Set(r.shares);
         if (exactSet.size > 1) {
           resultText += ` Exact shares: ${r.shares.map((s) => formatMoney(s, currency)).join(", ")}.`;
+        }
+        if (defaultsNote) {
+          resultText = `No amounts provided${defaultsNote} — showing the interactive calculator (adjust values in the panel). ` + resultText;
         }
 
         const webview = {

@@ -417,12 +417,11 @@
           const expenses = JSON.parse(params.get("expenses") || "[]");
           if (Array.isArray(expenses) && expenses.length > 0) {
             for (const [name, amount] of expenses) addExpenseRow(name, amount);
-            document.querySelectorAll("#expense-list .expense-row")[0].remove();
           }
         } catch (e) { /* fall through to empty state */ }
         if (document.querySelectorAll("#expense-list .expense-row").length === 0) {
-          addExpenseRow("Alice");
-          addExpenseRow("Bob");
+          addExpenseRow("Alice", "60");
+          addExpenseRow("Bob", "40");
         }
         render();
         return;

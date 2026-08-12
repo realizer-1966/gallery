@@ -61,7 +61,11 @@ open class AgentToolsImpl : AgentTools {
 
   private val activeTools = mutableListOf<ToolDefinition>()
 
-  val loadSkillTool by lazy { LoadSkillTool(skillsProvider = skillsProvider) }
+  val loadSkillTool by lazy {
+    LoadSkillTool(skillsProvider = skillsProvider) { skillName ->
+      runJsTool.lastLoadedSkillName = skillName
+    }
+  }
 
   val runMcpTool by lazy {
     RunMcpTool(

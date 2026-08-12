@@ -45,6 +45,9 @@ class RunJsTool(
   var resultImageToShow: CallJsSkillResultImage? = null
   var resultWebviewToShow: CallJsSkillResultWebview? = null
 
+  /** Updated by LoadSkillTool when a skill is loaded. */
+  var lastLoadedSkillName: String = ""
+
   /** Call JS skill */
   @Tool(description = "Runs JS script")
   fun runJs(
@@ -57,11 +60,8 @@ class RunJsTool(
     data: String = "",
   ): Map<String, Any> {
     return runBlocking(Dispatchers.Default) {
-      // Resolve skillName: if empty, fall back to the first available skill.
-      val resolvedSkillName = skillName.ifEmpty {
-        val available = skillsProvider.getAvailableSkills()
-        available.firstOrNull()?.name ?: ""
-      }
+      // Resolve skillName: if empty, fall back to the last loaded skill.
+      val resolvedSkillName = skillName.ifEmpty { lastLoadedSkillName }
       Log.d(
         TAG,
         "runJS tool called with:" +

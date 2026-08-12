@@ -26,7 +26,10 @@ import kotlinx.coroutines.runBlocking
 
 private const val TAG = "AGLoadSkillTool"
 
-class LoadSkillTool(private val skillsProvider: SkillsProvider) : ToolDefinition {
+class LoadSkillTool(
+  private val skillsProvider: SkillsProvider,
+  private val onSkillLoaded: (String) -> Unit = {},
+) : ToolDefinition {
   override val alwaysAllow: Boolean = true
   override var executionContext: ToolExecutionContext? = null
 
@@ -40,6 +43,7 @@ class LoadSkillTool(private val skillsProvider: SkillsProvider) : ToolDefinition
       val skillContent = skill?.getSkillContent() ?: "Skill not found"
       Log.d(TAG, "load skill. Skill content:\n$skillContent")
       if (skill != null) {
+        onSkillLoaded(skillName)
         executionContext
           ?.actionChannel
           ?.send(

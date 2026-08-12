@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Expense Splitter</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eaeaea;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 14px;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .app { width: 100%; max-width: 400px; }
+    h1 {
+      font-size: 20px;
+      text-align: center;
+      margin-bottom: 12px;
+      color: #ffd369;
+    }
+    .card {
+      background: #16213e;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+    }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .tab {
+      flex: 1;
+      padding: 10px 0;
+      border: none;
+      border-radius: 10px;
+      background: #0f3460;
+      color: #9fb3d1;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .tab.active {
+      background: #ffd369;
+      color: #1a1a2e;
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    label {
+      font-size: 13px;
+      color: #9fb3d1;
+      display: block;
+      margin-bottom: 4px;
+      white-space: nowrap;
+    }
+    input[type="number"], input[type="text"], select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #2a3a5e;
+      border-radius: 8px;
+      background: #0f3460;
+      color: #fff;
+      font-size: 16px;
+      outline: none;
+    }
+    input:focus { border-color: #ffd369; }
+    .field { flex: 1; min-width: 0; }
+    .field-sm { flex: 0 0 84px; }
+    select { appearance: auto; }
+    .expense-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+    .expense-row input { flex: 1; }
+    .expense-row .name-input { flex: 1.4; }
+    .remove-btn {
+      flex: 0 0 34px;
+      height: 40px;
+      border: none;
+      border-radius: 8px;
+      background: #4a1f2e;
+      color: #ff8fa3;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    .add-btn {
+      width: 100%;
+      padding: 10px;
+      border: 1px dashed #2a3a5e;
+      border-radius: 8px;
+      background: transparent;
+      color: #9fb3d1;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .add-btn:active { background: #0f3460; }
+    .summary-title {
+      font-size: 13px;
+      color: #9fb3d1;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .summary-line {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      font-size: 15px;
+    }
+    .summary-line.total { border-top: 1px solid #2a3a5e; margin-top: 4px; padding-top: 10px; }
+    .summary-line .big { font-size: 18px; font-weight: 700; color: #ffd369; }
+    .share-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 10px;
+      margin-top: 6px;
+      background: #0f3460;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .share-row .amount { font-weight: 700; color: #7fd8a4; }
+    .settle {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #1f3a52;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .settle .who { color: #ffd369; font-weight: 600; }
+    .settle .amt { color: #7fd8a4; font-weight: 700; }
+    .error {
+      background: #4a1f2e;
+      color: #ff8fa3;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-top: 10px;
+      display: none;
+    }
+    .hint { font-size: 12px; color: #6b7f9e; margin-top: 8px; text-align: center; }
+    .hidden { display: none; }
+    ::placeholder { color: #5a6f8f; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>💸 Expense Splitter</h1>
+
+    <div class="tabs">
+      <button class="tab active" id="tab-even" onclick="setMode('even')">Equal</button>
+      <button class="tab" id="tab-uneven" onclick="setMode('uneven')">Uneven</button>
+    </div>
+
+    <!-- Equal mode -->
+    <div class="card" id="panel-even">
+      <div class="row">
+        <div class="field">
+          <label>Bill total</label>
+          <input type="number" id="total" min="0" step="0.01" inputmode="decimal" placeholder="120.00" />
+        </div>
+        <div class="field-sm">
+          <label>Currency</label>
+          <select id="currency">
+            <option value="$">$</option>
+            <option value="€">€</option>
+            <option value="£">£</option>
+            <option value="₩">₩</option>
+            <option value="¥">¥</option>
+            <option value="₹">₹</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field-sm">
+          <label>People</label>
+          <input type="number" id="people" min="1" step="1" inputmode="numeric" placeholder="4" />
+        </div>
+        <div class="field-sm">
+          <label>Tip %</label>
+          <input type="number" id="tip" min="0" step="0.5" inputmode="decimal" placeholder="10" />
+        </div>
+        <div class="field-sm">
+          <label>Tax %</label>
+          <input type="number" id="tax" min="0" step="0.5" inputmode="decimal" placeholder="8" />
+        </div>
+      </div>
+      <div id="even-results"></div>
+    </div>
+
+    <!-- Uneven mode -->
+    <div class="card hidden" id="panel-uneven">
+      <div class="row">
+        <div class="field">
+          <label>Currency</label>
+          <select id="currency-u">
+            <option value="$">$</option>
+            <option value="€">€</option>
+            <option value="£">£</option>
+            <option value="₩">₩</option>
+            <option value="¥">¥</option>
+            <option value="₹">₹</option>
+          </select>
+        </div>
+      </div>
+      <div id="expense-list"></div>
+      <button class="add-btn" onclick="addExpenseRow()">+ Add person</button>
+      <div id="uneven-results"></div>
+    </div>
+
+    <div class="error" id="error"></div>
+    <div class="hint">Results update as you type</div>
+  </div>
+
+  <script>
+    // ── shared math (mirrors index.html) ─────────────────────────────────────
+    function round2(v) { return Math.round(v * 100) / 100; }
+    function fmt(amount, currency) {
+      const sign = amount < 0 ? "-" : "";
+      const [whole, frac] = Math.abs(amount).toFixed(2).split(".");
+      return sign + currency + whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + frac;
+    }
+    function distributeRemainder(totalCents, people) {
+      const base = Math.floor(totalCents / people);
+      const rem = totalCents % people;
+      const shares = new Array(people).fill(base);
+      for (let i = 0; i < rem; i++) shares[i] += 1;
+      return shares;
+    }
+    function splitEvenly(total, people, tip, tax) {
+      const tipAmt = round2(total * tip / 100);
+      const taxAmt = round2(total * tax / 100);
+      const grand = round2(total + tipAmt + taxAmt);
+      const cents = Math.round(grand * 100);
+      return {
+        tipAmt, taxAmt, grand,
+        perPerson: Math.round(cents / people) / 100,
+        shares: distributeRemainder(cents, people).map((c) => c / 100),
+      };
+    }
+    function settleDebts(expenses) {
+      let total = 0;
+      for (const [, a] of expenses) total += a;
+      total = round2(total);
+      const share = round2(total / expenses.length);
+      const balances = expenses.map(([name, paid]) => ({ name, balance: round2(paid - share) }));
+      const debtors = balances.filter((b) => b.balance < -0.005).map((b) => ({ ...b })).sort((a, b) => a.balance - b.balance);
+      const creditors = balances.filter((b) => b.balance > 0.005).map((b) => ({ ...b })).sort((a, b) => b.balance - a.balance);
+      const transfers = [];
+      let i = 0, j = 0;
+      while (i < debtors.length && j < creditors.length) {
+        const amt = round2(Math.min(-debtors[i].balance, creditors[j].balance));
+        transfers.push({ from: debtors[i].name, to: creditors[j].name, amount: amt });
+        debtors[i].balance = round2(debtors[i].balance + amt);
+        creditors[j].balance = round2(creditors[j].balance - amt);
+        if (Math.abs(debtors[i].balance) < 0.005) i++;
+        if (Math.abs(creditors[j].balance) < 0.005) j++;
+      }
+      return { total, share, balances, transfers };
+    }
+
+    // ── state ────────────────────────────────────────────────────────────────
+    let mode = "even";
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById("tab-even").classList.toggle("active", m === "even");
+      document.getElementById("tab-uneven").classList.toggle("active", m === "uneven");
+      document.getElementById("panel-even").classList.toggle("hidden", m !== "even");
+      document.getElementById("panel-uneven").classList.toggle("hidden", m !== "uneven");
+      render();
+    }
+
+    // ── uneven rows ───────────────────────────────────────────────────────────
+    let rowId = 0;
+    function addExpenseRow(name = "", amount = "") {
+      const list = document.getElementById("expense-list");
+      const div = document.createElement("div");
+      div.className = "expense-row";
+      div.dataset.row = rowId++;
+      div.innerHTML =
+        '<input class="name-input" type="text" placeholder="Name" value="' + escapeAttr(name) + '" oninput="render()" />' +
+        '<input type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" value="' + escapeAttr(amount) + '" oninput="render()" />' +
+        '<button class="remove-btn" onclick="removeExpenseRow(this)">×</button>';
+      list.appendChild(div);
+      render();
+    }
+    function removeExpenseRow(btn) {
+      const list = document.getElementById("expense-list");
+      if (list.children.length <= 1) return;
+      btn.parentElement.remove();
+      render();
+    }
+    function escapeAttr(s) {
+      return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    }
+    function getExpenses() {
+      const rows = document.querySelectorAll("#expense-list .expense-row");
+      const out = [];
+      rows.forEach((row) => {
+        const inputs = row.querySelectorAll("input");
+        const name = inputs[0].value.trim();
+        const amount = Number(inputs[1].value);
+        if (name && !isNaN(amount) && amount >= 0) out.push([name, round2(amount)]);
+      });
+      return out;
+    }
+
+    // ── rendering ─────────────────────────────────────────────────────────────
+    function showError(msg) {
+      const el = document.getElementById("error");
+      el.textContent = msg || "";
+      el.style.display = msg ? "block" : "none";
+    }
+
+    function renderEven() {
+      const currency = document.getElementById("currency").value;
+      const total = Number(document.getElementById("total").value);
+      const people = Math.floor(Number(document.getElementById("people").value));
+      const tip = Number(document.getElementById("tip").value) || 0;
+      const tax = Number(document.getElementById("tax").value) || 0;
+      const box = document.getElementById("even-results");
+
+      if (isNaN(total) || total < 0 || isNaN(people) || people < 1) {
+        box.innerHTML = "";
+        showError(isNaN(total) || total < 0 ? "Enter a valid bill total (≥ 0)." : "Enter the number of people (≥ 1).");
+        return;
+      }
+      showError("");
+      const r = splitEvenly(total, people, tip, tax);
+      let html = '<div class="summary-title">Summary</div>';
+      html += `<div class="summary-line"><span>Bill</span><span>${fmt(r.grand - r.tipAmt - r.taxAmt, currency)}</span></div>`;
+      if (r.tipAmt > 0) html += `<div class="summary-line"><span>Tip (${tip}%)</span><span>${fmt(r.tipAmt, currency)}</span></div>`;
+      if (r.taxAmt > 0) html += `<div class="summary-line"><span>Tax (${tax}%)</span><span>${fmt(r.taxAmt, currency)}</span></div>`;
+      html += `<div class="summary-line total"><span>Total</span><span class="big">${fmt(r.grand, currency)}</span></div>`;
+      html += `<div class="summary-line"><span>Per person</span><span>${fmt(r.perPerson, currency)}</span></div>`;
+      if (new Set(r.shares).size > 1) {
+        html += `<div class="summary-line"><span>Exact shares</span><span>${r.shares.map((s) => fmt(s, currency)).join(" · ")}</span></div>`;
+      } else {
+        html += `<div class="summary-line"><span>Exact shares</span><span>${fmt(r.shares[0], currency)} each</span></div>`;
+      }
+      box.innerHTML = html;
+    }
+
+    function renderUneven() {
+      const currency = document.getElementById("currency-u").value;
+      const expenses = getExpenses();
+      const box = document.getElementById("uneven-results");
+
+      if (expenses.length === 0) {
+        box.innerHTML = "";
+        showError("Add at least one person with a name and amount.");
+        return;
+      }
+      if (expenses.length === 1) {
+        box.innerHTML = "";
+        showError("Add at least 2 people to split expenses.");
+        return;
+      }
+      showError("");
+      const r = settleDebts(expenses);
+      let html = '<div class="summary-title">Summary</div>';
+      html += `<div class="summary-line"><span>Total</span><span class="big">${fmt(r.total, currency)}</span></div>`;
+      html += `<div class="summary-line"><span>Fair share each</span><span>${fmt(r.share, currency)}</span></div>`;
+      for (const b of r.balances) {
+        const cls = b.balance > 0.005 ? "amount" : "";
+        const sign = b.balance > 0.005 ? "+" : "";
+        html += `<div class="share-row"><span>${escapeHtml(b.name)}</span><span class="${cls}">${sign}${fmt(b.balance, currency)}</span></div>`;
+      }
+      if (r.transfers.length > 0) {
+        html += '<div class="settle">';
+        for (const t of r.transfers) {
+          html += `👉 <span class="who">${escapeHtml(t.from)}</span> pays <span class="who">${escapeHtml(t.to)}</span> <span class="amt">${fmt(t.amount, currency)}</span><br>`;
+        }
+        html += "</div>";
+      } else {
+        html += '<div class="settle">✅ Everyone already paid equally — no transfers needed.</div>';
+      }
+      box.innerHTML = html;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function render() {
+      if (mode === "even") renderEven();
+      else renderUneven();
+    }
+
+    // ── init: read URL params ─────────────────────────────────────────────────
+    (function init() {
+      const params = new URLSearchParams(location.search);
+      const modeParam = params.get("mode");
+      const currency = params.get("currency") || "$";
+
+      if (modeParam === "uneven") {
+        setMode("uneven");
+        document.getElementById("currency-u").value = currency;
+        try {
+          const expenses = JSON.parse(params.get("expenses") || "[]");
+          if (Array.isArray(expenses) && expenses.length > 0) {
+            for (const [name, amount] of expenses) addExpenseRow(name, amount);
+            document.querySelectorAll("#expense-list .expense-row")[0].remove();
+          }
+        } catch (e) { /* fall through to empty state */ }
+        if (document.querySelectorAll("#expense-list .expense-row").length === 0) {
+          addExpenseRow("Alice");
+          addExpenseRow("Bob");
+        }
+        render();
+        return;
+      }
+
+      // even
+      document.getElementById("currency").value = currency;
+      const total = params.get("total");
+      const people = params.get("people");
+      const tip = params.get("tip");
+      const tax = params.get("tax");
+      if (total !== null) document.getElementById("total").value = total;
+      if (people !== null) document.getElementById("people").value = people;
+      if (tip !== null) document.getElementById("tip").value = tip;
+      if (tax !== null) document.getElementById("tax").value = tax;
+      if (total === null && people === null) {
+        document.getElementById("total").value = "100";
+        document.getElementById("people").value = "4";
+      }
+      render();
+    })();
+  </script>
+</body>
+</html>

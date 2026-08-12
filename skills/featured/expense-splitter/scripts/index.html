@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense Splitter Skill</title>
+</head>
+<body>
+  <script>
+    // ── Expense Splitter logic (JS mirror of expense_splitter/core.py) ──────
+
+    function round2(value) {
+      return Math.round(value * 100) / 100;
+    }
+
+    function formatMoney(amount, currency) {
+      const sign = amount < 0 ? "-" : "";
+      const abs = Math.abs(amount);
+      const [whole, frac] = abs.toFixed(2).split(".");
+      const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      return `${sign}${currency}${withCommas}.${frac}`;
+    }
+
+    function distributeRemainder(totalCents, people) {
+      const base = Math.floor(totalCents / people);
+      const rem = totalCents % people;
+      const shares = new Array(people).fill(base);
+      for (let i = 0; i < rem; i++) shares[i] += 1;
+      return shares;
+    }
+
+    function splitEvenly(total, people, tipPercent, taxPercent) {
+      const tipAmount = round2(total * tipPercent / 100);
+      const taxAmount = round2(total * taxPercent / 100);
+      const grandTotal = round2(total + tipAmount + taxAmount);
+      const grandCents = Math.round(grandTotal * 100);
+      const sharesCents = distributeRemainder(grandCents, people);
+      const perPerson = Math.round(grandCents / people) / 100;
+      return {
+        total: round2(total),
+        tipAmount,
+        taxAmount,
+        grandTotal,
+        perPerson,
+        shares: sharesCents.map((c) => c / 100),
+      };
+    }
+
+    function settleDebts(expenses) {
+      // expenses: [[name, amount], ...]
+      let total = 0;
+      for (const [, amount] of expenses) total += amount;
+      total = round2(total);
+      const n = expenses.length;
+      const share = round2(total / n);
+
+      const balances = expenses.map(([name, paid]) => ({
+        name,
+        balance: round2(paid - share),
+      }));
+
+      // copy objects — mutating debtors/creditors must NOT touch balances
+      const debtors = balances
+        .filter((b) => b.balance < -0.005)
+        .map((b) => ({ ...b }))
+        .sort((a, b) => a.balance - b.balance);
+      const creditors = balances
+        .filter((b) => b.balance > 0.005)
+        .map((b) => ({ ...b }))
+        .sort((a, b) => b.balance - a.balance);
+
+      const transfers = [];
+      let i = 0, j = 0;
+      while (i < debtors.length && j < creditors.length) {
+        const amount = round2(Math.min(-debtors[i].balance, creditors[j].balance));
+        transfers.push({ from: debtors[i].name, to: creditors[j].name, amount });
+        debtors[i].balance = round2(debtors[i].balance + amount);
+        creditors[j].balance = round2(creditors[j].balance - amount);
+        if (Math.abs(debtors[i].balance) < 0.005) i += 1;
+        if (Math.abs(creditors[j].balance) < 0.005) j += 1;
+      }
+      return { total, share, balances, transfers };
+    }
+
+    // ── Entry point ───────────────────────────────────────────────────────────
+    window['ai_edge_gallery_get_result'] = async (dataStr) => {
+      try {
+        const d = JSON.parse(dataStr || '{}');
+        const currency = typeof d.currency === "string" && d.currency ? d.currency : "$";
+        const action = d.action === "uneven" ? "uneven" : "even";
+
+        if (action === "uneven") {
+          if (!Array.isArray(d.expenses) || d.expenses.length === 0) {
+            return JSON.stringify({ error: "For uneven split, provide 'expenses' as a non-empty array of [name, amount] pairs, e.g. [[\"Alice\", 30], [\"Bob\", 25]]." });
+          }
+          const expenses = d.expenses.map((e) => {
+            if (!Array.isArray(e) || e.length < 2) {
+              throw new Error("Each expense must be [name, amount].");
+            }
+            const name = String(e[0]).trim();
+            const amount = Number(e[1]);
+            if (!name) throw new Error("Expense names must not be empty.");
+            if (isNaN(amount) || amount < 0) {
+              throw new Error(`Invalid amount for '${name}'.`);
+            }
+            return [name, amount];
+          });
+
+          const result = settleDebts(expenses);
+          const lines = [`Total ${formatMoney(result.total, currency)}, fair share ${formatMoney(result.share, currency)} each.`];
+          if (result.transfers.length === 0) {
+            lines.push("Everyone already paid equally — no transfers needed.");
+          } else {
+            lines.push("Settle up:");
+            for (const t of result.transfers) {
+              lines.push(`- ${t.from} pays ${t.to} ${formatMoney(t.amount, currency)}`);
+            }
+          }
+
+          const webview = {
+            url: `webview.html?mode=uneven&currency=${encodeURIComponent(currency)}&expenses=${encodeURIComponent(JSON.stringify(expenses))}&v=${Date.now()}`,
+            aspectRatio: 1.2,
+          };
+          return JSON.stringify({ result: lines.join("\n"), webview });
+        }
+
+        // even mode (default)
+        const total = Number(d.total);
+        const people = Math.floor(Number(d.people));
+        const tipPercent = d.tip_percent === undefined ? 0 : Number(d.tip_percent);
+        const taxPercent = d.tax_percent === undefined ? 0 : Number(d.tax_percent);
+
+        if (isNaN(total) || total < 0) {
+          return JSON.stringify({ error: "Invalid 'total'. Provide a non-negative number." });
+        }
+        if (isNaN(people) || people < 1) {
+          return JSON.stringify({ error: "Invalid 'people'. Provide a positive integer (>= 1)." });
+        }
+        if (isNaN(tipPercent) || isNaN(taxPercent) || tipPercent < 0 || taxPercent < 0) {
+          return JSON.stringify({ error: "tip_percent and tax_percent must be non-negative numbers." });
+        }
+
+        const r = splitEvenly(total, people, tipPercent, taxPercent);
+        const parts = ["Bill: " + formatMoney(r.total, currency)];
+        if (r.tipAmount > 0) parts.push(`${tipPercent}% tip (${formatMoney(r.tipAmount, currency)})`);
+        if (r.taxAmount > 0) parts.push(`${taxPercent}% tax (${formatMoney(r.taxAmount, currency)})`);
+        let resultText = `${parts.join(" + ")} = ${formatMoney(r.grandTotal, currency)}. Each of ${people} pays ${formatMoney(r.perPerson, currency)}.`;
+
+        const exactSet = new Set(r.shares);
+        if (exactSet.size > 1) {
+          resultText += ` Exact shares: ${r.shares.map((s) => formatMoney(s, currency)).join(", ")}.`;
+        }
+
+        const webview = {
+          url: `webview.html?mode=even&currency=${encodeURIComponent(currency)}&total=${encodeURIComponent(r.total)}&people=${encodeURIComponent(people)}&tip=${encodeURIComponent(tipPercent)}&tax=${encodeURIComponent(taxPercent)}&result=${encodeURIComponent(resultText)}&v=${Date.now()}`,
+          aspectRatio: 1.2,
+        };
+        return JSON.stringify({ result: resultText, webview });
+      } catch (e) {
+        console.error(e);
+        return JSON.stringify({ error: `Expense splitter error: ${e.message}` });
+      }
+    };
+  </script>
+</body>
+</html>

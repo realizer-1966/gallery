@@ -48,29 +48,34 @@ class RunJsTool(
   /** Call JS skill */
   @Tool(description = "Runs JS script")
   fun runJs(
-    @ToolParam(description = "The name of skill") skillName: String,
+    @ToolParam(description = "The name of skill") skillName: String = "",
     @ToolParam(description = "The script name to run. Use 'index.html' if not provided by user")
-    scriptName: String,
+    scriptName: String = "index.html",
     @ToolParam(
       description = "The data to pass to the script. Use empty string if not provided by user"
     )
-    data: String,
+    data: String = "",
   ): Map<String, Any> {
     return runBlocking(Dispatchers.Default) {
+      // Resolve skillName: if empty, fall back to the first available skill.
+      val resolvedSkillName = skillName.ifEmpty {
+        val available = skillsProvider.getAvailableSkills()
+        available.firstOrNull()?.name ?: ""
+      }
       Log.d(
         TAG,
         "runJS tool called with:" +
-          "\n- skillName: ${skillName}\n- scriptName: ${scriptName}\n- data: ${data}\n",
+          "\n- skillName: ${skillName} (resolved: ${resolvedSkillName})\n- scriptName: ${scriptName}\n- data: ${data}\n",
       )
 
-      val skill = skillsProvider.loadSkill(skillName)
+      val skill = skillsProvider.loadSkill(resolvedSkillName)
 
       if (skill == null) {
         executionContext
           ?.actionChannel
           ?.send(
             SkillProgressToolAction(
-              label = "Failed to call skill \"$scriptName\"",
+              label = "Failed to call skill \"${scriptName}\"",
               inProgress = false,
             )
           )
@@ -84,7 +89,7 @@ class RunJsTool(
       var secret = ""
       if (skill.requireSecret) {
         val savedSecret =
-          dataStoreRepository.readSecret(key = getSkillSecretKey(skillName = skillName))
+          dataStoreRepository.readSecret(key = getSkillSecretKey(skillName = resolvedSkillName))
         if (savedSecret == null || savedSecret.isEmpty()) {
           val action =
             AskInfoToolAction(
@@ -98,7 +103,7 @@ class RunJsTool(
           secret = action.result.await()
           if (secret.isNotEmpty()) {
             dataStoreRepository.saveSecret(
-              key = getSkillSecretKey(skillName = skillName),
+              key = getSkillSecretKey(skillName = resolvedSkillName),
               value = secret,
             )
             Log.d(TAG, "Got Secret from ask info dialog: ${secret.substring(0, 3)}")
@@ -123,9 +128,9 @@ class RunJsTool(
         ?.actionChannel
         ?.send(
           SkillProgressToolAction(
-            label = "Calling JS script \"${skillName}/${scriptName}\"",
+            label = "Calling JS script \"${resolvedSkillName}/${scriptName}\"",
             inProgress = true,
-            addItemTitle = "Call JS script: \"${skillName}/${scriptName}\"",
+            addItemTitle = "Call JS script: \"${resolvedSkillName}/${scriptName}\"",
             addItemDescription = "- URL: ${url.replace(LOCAL_URL_BASE, "")}\n- Data: $data",
             customData = skill,
           )

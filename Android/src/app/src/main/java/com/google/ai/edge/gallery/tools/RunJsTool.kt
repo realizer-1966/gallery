@@ -61,7 +61,13 @@ class RunJsTool(
   ): Map<String, Any> {
     return runBlocking(Dispatchers.Default) {
       // Resolve skillName: if empty, fall back to the last loaded skill.
-      val resolvedSkillName = skillName.ifEmpty { lastLoadedSkillName }
+      // If that's also empty and only one skill is available, use it.
+      val resolvedSkillName = skillName.ifEmpty {
+        lastLoadedSkillName.ifEmpty {
+          val available = skillsProvider.getAvailableSkills()
+          if (available.size == 1) available.first().name else ""
+        }
+      }
       Log.d(
         TAG,
         "runJS tool called with:" +

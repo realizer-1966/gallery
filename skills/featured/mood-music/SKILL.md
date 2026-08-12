@@ -13,6 +13,12 @@ metadata:
 
 You MUST use a strict two-step process to generate music. This ensures you only request musical genres that are currently supported by the Loudly API.
 
+Call the `run_js` tool with **ALL THREE of the following exact parameters — you MUST include all three, never omit any of them.** Omitting any one causes the tool call to fail with a parameter error:
+
+- **skill_name**: `"mood-music"` — the name of this skill. ALWAYS include it, always exactly `"mood-music"`.
+- **script_name**: `"get_genres.html"` (Step 1) or `"index.html"` (Step 2) — the script to run.
+- **data**: A JSON string with the fields described below. If empty, set `data` to the string `""` — do NOT omit the `data` parameter itself.
+
 ### Step 1: Fetch Available Genres
 Call the `run_js` tool with `get_genres.html` as the script name and an empty JSON payload (`{}`). 
 - This will return a list of currently available genres and their descriptions. 

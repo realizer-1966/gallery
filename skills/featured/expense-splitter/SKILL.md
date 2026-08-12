@@ -16,11 +16,11 @@ This skill matches requests about bill splitting, expense calculation, cost shar
 
 ## Instructions
 
-First use the `load_skill` tool if the skill instructions are not already in context. Then call the `run_js` tool with **ALL THREE of the following exact parameters** — missing `skill_name` causes the tool call to fail:
+First use the `load_skill` tool if the skill instructions are not already in context. Then call the `run_js` tool with **ALL THREE of the following exact parameters — you MUST include all three, never omit any of them.** Omitting any one causes the tool call to fail with a parameter error:
 
-- **skill_name**: `"expense-splitter"` — the name of this skill. ALWAYS include it.
-- **script_name**: `"index.html"` — the script to run. Always `"index.html"`.
-- **data**: A JSON string with these fields:
+- **skill_name**: `"expense-splitter"` — the name of this skill. ALWAYS include it, always exactly `"expense-splitter"`.
+- **script_name**: `"index.html"` — the script to run. Always `"index.html"`, always exactly this.
+- **data**: A JSON string with these fields. If the user gave no numbers, set `data` to the string `""` (an empty string) — do NOT omit the `data` parameter itself.
   - `action`: String — one of `"even"`, `"uneven"`. Defaults to `"even"`.
   - `total`: Number — the bill total (for `"even"`). If the user didn't give a number, OMIT it — the skill uses $100 as a default.
   - `people`: Integer — number of people (for `"even"`, ≥ 1). If missing, the skill uses 4 as a default.

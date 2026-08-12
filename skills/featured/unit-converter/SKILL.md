@@ -11,8 +11,10 @@ Convert between common units of length, weight, temperature, and data size.
 
 ## Instructions
 
-Call the `run_js` tool with the following exact parameters:
+Call the `run_js` tool with **ALL THREE of the following exact parameters** — missing `skill_name` causes the tool call to fail:
 
+- **skill_name**: `"unit-converter"` — the name of this skill. ALWAYS include it.
+- **script_name**: `"index.html"` — the script to run. Always `"index.html"`.
 - **data**: A JSON string with these fields:
   - `value`: Number — the numeric value to convert (required).
   - `from`: String — source unit (required).

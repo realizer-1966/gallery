@@ -16,8 +16,10 @@ This skill matches requests about bill splitting, expense calculation, cost shar
 
 ## Instructions
 
-First use the `load_skill` tool if the skill instructions are not already in context. Then call the `run_js` tool with the following exact parameters:
+First use the `load_skill` tool if the skill instructions are not already in context. Then call the `run_js` tool with **ALL THREE of the following exact parameters** — missing `skill_name` causes the tool call to fail:
 
+- **skill_name**: `"expense-splitter"` — the name of this skill. ALWAYS include it.
+- **script_name**: `"index.html"` — the script to run. Always `"index.html"`.
 - **data**: A JSON string with these fields:
   - `action`: String — one of `"even"`, `"uneven"`. Defaults to `"even"`.
   - `total`: Number — the bill total (for `"even"`). If the user didn't give a number, OMIT it — the skill uses $100 as a default.
@@ -27,11 +29,18 @@ First use the `load_skill` tool if the skill instructions are not already in con
   - `expenses`: Array of `[name, amount]` pairs — what each person paid (for `"uneven"`). Example: `[["Alice", 30], ["Bob", 25]]`. If missing, the skill shows sample values.
   - `currency`: String (optional) — currency symbol, default `"$"`.
 
-**IMPORTANT — if the user does not provide amounts or people, still call `run_js` with an empty JSON payload `{}` (or just the fields the user gave).** The skill never errors on missing values: it opens an interactive calculator with defaults the user can adjust. Do NOT ask for more details when numbers are missing — run the skill anyway.
+**Example call:**
+
+```
+run_js(skill_name="expense-splitter", script_name="index.html",
+       data='{"action": "even", "total": 110, "people": 3}')
+```
+
+**IMPORTANT — if the user does not provide amounts or people, still call `run_js` with an empty data string `""` (or just the fields the user gave).** The skill never errors on missing values: it opens an interactive calculator with defaults the user can adjust. Do NOT ask for more details when numbers are missing — run the skill anyway. Do NOT compute the split yourself — always let the skill do it.
 
 ### Examples
 
-| Action | Data | Result |
+| Action | data | Result |
 |---|---|---|
 | even | `{"total": 120, "people": 4, "tip_percent": 10}` | Bill: $120.00 + 10% tip ($12.00) = $132.00. Each of 4 pays $33.00. |
 | even | `{"total": 100, "people": 3}` | 3 people, each pays $33.34 / $33.33 / $33.33 (exact-cent split). |

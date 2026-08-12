@@ -11,8 +11,10 @@ A simple calculator for basic arithmetic operations.
 
 ## Instructions
 
-Call the `run_js` tool with the following exact parameters:
+Call the `run_js` tool with **ALL THREE of the following exact parameters** — missing `skill_name` causes the tool call to fail:
 
+- **skill_name**: `"calculator"` — the name of this skill. ALWAYS include it.
+- **script_name**: `"index.html"` — the script to run. Always `"index.html"`.
 - **data**: A JSON string with the following fields:
   - `a`: Number — the first number (or the only number for sqrt).
   - `op`: String — the operator. One of: `"+"`, `"-"`, `"*"`, `"/"`, `"^"`, `"sqrt"`, `"%"`.

@@ -44,6 +44,15 @@ class TestSkillMd:
     def test_mentions_run_js(self):
         assert "run_js" in self.content, "SKILL.md must instruct run_js"
 
+    def test_documents_run_js_params(self):
+        # The app's runJs tool REQUIRES skill_name + script_name + data.
+        # On-device LLMs omit them unless SKILL.md spells them out, causing
+        # "skill_name parameter was missing" failures (observed in production).
+        for param in ["skill_name", "script_name", "data"]:
+            assert param in self.content, (
+                f"SKILL.md must document the '{param}' run_js parameter"
+            )
+
     def test_mentions_both_actions(self):
         for action in ["even", "uneven"]:
             assert action in self.content, f"SKILL.md must document '{action}' action"
